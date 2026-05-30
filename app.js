@@ -2,11 +2,11 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const swaggerUi = require("swagger-ui-express");
 const { errorHandler, notFound } = require("./src/middlewares/error.middleware");
 const authRoutes = require("./src/modules/auth/auth.routes");
 const profilesRoutes = require("./src/modules/profiles/profiles.routes");
 const { buildSwaggerSpec } = require("./src/docs/swagger");
+const { getSwaggerHtml } = require("./src/docs/swaggerPage");
 
 const app = express();
 
@@ -34,21 +34,10 @@ const authLimiter = rateLimit({
   message: { success: false, message: "Too many auth attempts, please try again later" },
 });
 
-// ─── Swagger API Docs (قبل rate limiter — Express 5 compatible mount) ─────────
-const swaggerUiOptions = {
-  customSiteTitle: "Maallem API Docs",
-  swaggerOptions: {
-    url: "/api-docs.json",
-    persistAuthorization: true,
-    displayRequestDuration: true,
-  },
-};
-
-const swaggerSetup = swaggerUi.setup(undefined, swaggerUiOptions);
-const docsRouter = express.Router();
-docsRouter.use(swaggerUi.serve);
-docsRouter.get("/", swaggerSetup);
-app.use("/api-docs", docsRouter);
+// ─── Swagger API Docs (CDN — works on Vercel serverless) ─────────────────────
+app.get(["/api-docs", "/api-docs/"], (req, res) => {
+  res.type("html").send(getSwaggerHtml());
+});
 app.get("/api-docs.json", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json(buildSwaggerSpec(req));

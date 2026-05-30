@@ -1,10 +1,10 @@
-const mongoose = require("mongoose");
 const app = require("./app");
-const { PORT, MONGO_URI } = require("./src/config/env");
+const connectDB = require("./src/config/db");
+const { PORT } = require("./src/config/env");
 
 const startServer = async () => {
   try {
-    await mongoose.connect(MONGO_URI);
+    await connectDB();
     console.log("✅ MongoDB connected");
 
     const server = app.listen(PORT, () => {
