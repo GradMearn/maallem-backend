@@ -6,7 +6,7 @@ const swaggerUi = require("swagger-ui-express");
 const { errorHandler, notFound } = require("./src/middlewares/error.middleware");
 const authRoutes = require("./src/modules/auth/auth.routes");
 const profilesRoutes = require("./src/modules/profiles/profiles.routes");
-const swaggerSpec = require("./src/docs/swagger");
+const { buildSwaggerSpec } = require("./src/docs/swagger");
 
 const app = express();
 
@@ -38,18 +38,20 @@ const authLimiter = rateLimit({
 const swaggerUiOptions = {
   customSiteTitle: "Maallem API Docs",
   swaggerOptions: {
+    url: "/api-docs.json",
     persistAuthorization: true,
     displayRequestDuration: true,
   },
 };
 
-const swaggerSetup = swaggerUi.setup(swaggerSpec, swaggerUiOptions);
+const swaggerSetup = swaggerUi.setup(undefined, swaggerUiOptions);
 const docsRouter = express.Router();
 docsRouter.use(swaggerUi.serve);
 docsRouter.get("/", swaggerSetup);
 app.use("/api-docs", docsRouter);
 app.get("/api-docs.json", (req, res) => {
-  res.json(swaggerSpec);
+  res.setHeader("Cache-Control", "no-store");
+  res.json(buildSwaggerSpec(req));
 });
 
 app.use(limiter);
@@ -80,11 +82,15 @@ app.get("/api/v1", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
+  const base = req.headers["x-forwarded-host"]
+    ? `${req.headers["x-forwarded-proto"] || "https"}://${req.headers["x-forwarded-host"]}`
+    : null;
   res.json({
     success: true,
     message: "Server is running 🚀",
     docs: "/api-docs",
     api: "/api/v1",
+    baseUrl: base,
   });
 });
 

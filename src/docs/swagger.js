@@ -1,28 +1,61 @@
-const { PORT } = require("../config/env");
+const { PORT, API_BASE_URL, VERCEL_URL } = require("../config/env");
 
-const swaggerSpec = {
+const PRODUCTION_HOST = "maallem-backend.vercel.app";
+
+const getRequestBaseUrl = (req) => {
+  if (!req?.headers) return null;
+  const protocol =
+    req.headers["x-forwarded-proto"]?.split(",")[0]?.trim() ||
+    (req.secure ? "https" : "http") ||
+    "https";
+  const host =
+    req.headers["x-forwarded-host"]?.split(",")[0]?.trim() ||
+    req.headers.host;
+  if (!host) return null;
+  return `${protocol}://${host}`;
+};
+
+const getServerBaseUrls = (req) => {
+  const urls = [];
+  const fromRequest = getRequestBaseUrl(req);
+  if (fromRequest) urls.push(fromRequest);
+  if (API_BASE_URL) urls.push(API_BASE_URL.replace(/\/$/, ""));
+  else if (VERCEL_URL) urls.push(`https://${VERCEL_URL}`);
+  urls.push(`https://${PRODUCTION_HOST}`);
+  urls.push(`http://localhost:${PORT}`);
+  return [...new Set(urls)];
+};
+
+const buildServers = (req) => {
+  const bases = getServerBaseUrls(req);
+  const servers = [];
+  for (const base of bases) {
+    servers.push({
+      url: `${base}/api/v1`,
+      description: `${base} — API v1`,
+    });
+    servers.push({
+      url: `${base}/api`,
+      description: `${base} — API alias`,
+    });
+  }
+  return servers;
+};
+
+const swaggerDocument = {
   openapi: "3.0.3",
   info: {
     title: "Maallem API",
     version: "1.0.0",
     description:
       "Maallem backend — Authentication & Profiles (Worker / Company).\n\n" +
+      "**Production:** https://maallem-backend.vercel.app\n\n" +
       "**Auth:** Register/login, refresh token, profile (`/me`).\n\n" +
       "**Profiles:** Public listing by ID; worker/company manage their profile via `/worker/me` and `/company/me` (multipart for images).",
     contact: {
       name: "Maallem Team",
     },
   },
-  servers: [
-    {
-      url: `http://localhost:${PORT}/api/v1`,
-      description: "API v1 (recommended)",
-    },
-    {
-      url: `http://localhost:${PORT}/api`,
-      description: "API alias (same routes, without v1)",
-    },
-  ],
   tags: [
     { name: "Auth", description: "Registration, login, tokens" },
     { name: "Profiles - Workers (Public)", description: "No authentication required" },
@@ -920,4 +953,9 @@ const swaggerSpec = {
   },
 };
 
-module.exports = swaggerSpec;
+const buildSwaggerSpec = (req) => ({
+  ...swaggerDocument,
+  servers: buildServers(req),
+});
+
+module.exports = { swaggerDocument, buildSwaggerSpec, buildServers };
